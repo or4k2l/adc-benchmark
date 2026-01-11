@@ -1,20 +1,21 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Virtualenv
-.env/
-.venv/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
 venv/
-
-# Editor directories
-.vscode/
+.venv/
 .idea/
+.vscode/
+.ipynb_checkpoints/
 
-# Data / plots
-adc_temperature_sweep.png
+# Test / tooling
+.pytest_cache/
+coverage/
+htmlcov/
+
+# output
+*.png
 *.log
-
-# OS files
-.DS_Store
