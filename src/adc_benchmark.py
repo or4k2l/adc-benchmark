@@ -113,8 +113,12 @@ class QuantumCircuit:
         
         sm, sp, sz = self.ops['sm'], self.ops['sp'], self.ops['sz']
         
-        # Thermal occupation
-        nth = 1/(np.exp(ENERGY_SCALE_MK/self.T)-1) if ENERGY_SCALE_MK/self.T<20 else 0
+        # Thermal occupation - robust calculation to prevent overflow
+        arg = ENERGY_SCALE_MK / float(self.T)
+        # Prevent overflow for extremely large arg; exp(>700) overflows in double
+        arg_clamped = min(arg, 700.0)
+        # If arg is large, nth ~ 0
+        nth = 1.0 / (np.exp(arg_clamped) - 1.0) if arg_clamped < 700.0 else 0.0
         
         # T1 relaxation
         c = [np.sqrt(γ_relax*(1+nth))*sm[i] for i in range(self.N)]
@@ -297,17 +301,21 @@ def run_state_preparation(T=50, config=None, cycles=16, num_seeds=20):
         fidelities.append(fid)
     
     # Bootstrap confidence intervals
+    # Use fixed RNG seed for reproducibility and bootstrap the MEDIAN
     fidelities = np.array(fidelities)
+    rng = np.random.default_rng(12345)
+    n_boot = 2000
     bootstraps = np.array([
-        np.mean(np.random.choice(fidelities, len(fidelities), replace=True))
-        for _ in range(1000)
+        np.median(rng.choice(fidelities, size=len(fidelities), replace=True))
+        for _ in range(n_boot)
     ])
     ci_low, ci_high = np.quantile(bootstraps, [0.025, 0.975])
+    median = float(np.median(fidelities))
     
     return {
-        'median': np.median(fidelities),
-        'ci_low': ci_low,
-        'ci_high': ci_high,
+        'median': median,
+        'ci_low': float(ci_low),
+        'ci_high': float(ci_high),
         'gates': gates
     }
 

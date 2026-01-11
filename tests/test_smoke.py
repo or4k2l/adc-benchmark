@@ -80,6 +80,9 @@ def test_quick_benchmark():
     assert 0 <= result['median'] <= 1
     assert 0 <= result['ci_low'] <= 1
     assert 0 <= result['ci_high'] <= 1
+    # Verify median is within CI bounds
+    assert result['ci_low'] <= result['median'] <= result['ci_high'], \
+        f"Median {result['median']} should be within CI [{result['ci_low']}, {result['ci_high']}]"
 
 
 def test_import_main():
