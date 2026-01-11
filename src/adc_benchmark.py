@@ -30,6 +30,9 @@ import warnings
 import argparse
 warnings.filterwarnings('ignore')
 
+# Physical constants
+ENERGY_SCALE_MK = 240  # Energy scale in mK for thermal occupation calculation
+
 # ============================================================================
 # HARDWARE MODEL
 # ============================================================================
@@ -111,7 +114,7 @@ class QuantumCircuit:
         sm, sp, sz = self.ops['sm'], self.ops['sp'], self.ops['sz']
         
         # Thermal occupation
-        nth = 1/(np.exp(240/self.T)-1) if 240/self.T<20 else 0
+        nth = 1/(np.exp(ENERGY_SCALE_MK/self.T)-1) if ENERGY_SCALE_MK/self.T<20 else 0
         
         # T1 relaxation
         c = [np.sqrt(γ_relax*(1+nth))*sm[i] for i in range(self.N)]

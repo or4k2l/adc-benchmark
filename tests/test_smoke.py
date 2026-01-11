@@ -4,12 +4,8 @@ Quick validation for CI pipeline
 """
 import pytest
 import numpy as np
-import sys
-import os
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
+# Tests use direct import from src directory
 from adc_benchmark import (
     QuantumCircuit,
     make_mitigation,

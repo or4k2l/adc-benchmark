@@ -7,7 +7,6 @@ from .adc_benchmark import (
     run_state_preparation,
     optimize_gamma_compute,
     temperature_sweep,
-    main
 )
 
 __version__ = "0.1.0"
@@ -17,5 +16,4 @@ __all__ = [
     'run_state_preparation',
     'optimize_gamma_compute',
     'temperature_sweep',
-    'main'
 ]
