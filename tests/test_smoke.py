@@ -7,6 +7,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Constants
+SMOKE_TEST_TIMEOUT = 180  # seconds - timeout for quick mode execution
+MODULE_NAME = "src"  # The main module name to run
+
 
 def test_quick_mode_end_to_end():
     """
@@ -27,8 +31,8 @@ def test_quick_mode_end_to_end():
     
     # Run the benchmark in quick mode
     result = subprocess.run(
-        [sys.executable, "-m", "src", "--quick"],
-        timeout=180,
+        [sys.executable, "-m", MODULE_NAME, "--quick"],
+        timeout=SMOKE_TEST_TIMEOUT,
         capture_output=True,
         text=True
     )
