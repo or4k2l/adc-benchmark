@@ -27,17 +27,29 @@ pip install -r requirements.txt
 ```
 
 Run
-- Quick smoke run (fast, used by CI):
+- Quick smoke run (fast, runs 50 mK quick mode, writes `adc_temperature_sweep.png`):
 ```bash
-python -m adc_benchmark --quick
+python -m src --quick
+```
+Or run the script directly:
+```bash
+python src/adc_benchmark.py --quick
 ```
 - Full benchmark:
 ```bash
-python -m adc_benchmark
+python -m src
+```
+Or:
+```bash
+python src/adc_benchmark.py
 ```
 
 Testing & CI
-- A lightweight smoke test is provided in `tests/`. GitHub Actions runs the smoke test in a small conda environment.
+- A lightweight smoke test is provided in `tests/`. Run it locally with:
+```bash
+pytest -q tests/test_smoke.py
+```
+- GitHub Actions runs the smoke test in a small conda environment.
 
 Files to pay attention to
 - `adc_benchmark.py` (main script) — move top-level prints under `main()` and add `--quick` flag.
