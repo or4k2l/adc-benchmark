@@ -57,11 +57,5 @@ def test_quick_mode_end_to_end():
         f"Output file '{output_file}' exists but is empty (size: {file_size} bytes)"
     )
     
-    print(f"✅ Quick mode test passed: {output_file} created ({file_size} bytes)")
-    
     # Clean up the generated file
     output_file.unlink()
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
