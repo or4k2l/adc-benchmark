@@ -11,6 +11,11 @@ venv/
 .vscode/
 .ipynb_checkpoints/
 
+# Build / packaging
+*.egg-info/
+dist/
+build/
+
 # Test / tooling
 .pytest_cache/
 coverage/
