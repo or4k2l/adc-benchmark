@@ -1,0 +1,2 @@
+[console_scripts]
+adc-benchmark = src.adc_benchmark:main

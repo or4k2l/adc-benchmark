@@ -23,12 +23,12 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for CI
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 import qutip as qt
 from datetime import datetime
 import warnings
 import argparse
-warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore', category=FutureWarning, module='qutip')
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='qutip')
 
 # Physical constants
 ENERGY_SCALE_MK = 240  # Energy scale in mK for thermal occupation calculation
@@ -71,7 +71,7 @@ class QuantumCircuit:
             t: Time point (for time-dependent noise)
             drive: Enable Rabi drive during gate operations
         """
-        np.random.seed(self.seed + int(t*100))
+        rng = np.random.default_rng(self.seed + int(t * 100))
         sx, sz = self.ops['sx'], self.ops['sz']
         
         # Ideal Hamiltonian
@@ -87,12 +87,12 @@ class QuantumCircuit:
         crosstalk = self.crosstalk_base if not drive else self.crosstalk_base * 5.0
         
         # Thermal noise
-        H += sum([thermal*np.random.randn()*sz[i] for i in range(self.N)])
+        H += sum([thermal*rng.standard_normal()*sz[i] for i in range(self.N)])
         
         # Crosstalk
         for i in range(self.N):
             for j in range(i+2, self.N):
-                H += crosstalk*np.random.randn()*(sx[i]*sx[j])
+                H += crosstalk*rng.standard_normal()*(sx[i]*sx[j])
         
         # 1/f flux noise
         w = 0.1+t*0.01
@@ -134,7 +134,7 @@ class QuantumCircuit:
 # MITIGATION STRATEGIES
 # ============================================================================
 
-def depolarize(ρ, p=0.002):
+def depolarize(ρ: qt.Qobj, p: float = 0.002) -> qt.Qobj:
     """Apply depolarizing channel (gate error model)"""
     if p == 0:
         return ρ
@@ -143,7 +143,7 @@ def depolarize(ρ, p=0.002):
     dim = 2**N
     return (1-p)*ρ + p * I / dim
 
-def make_mitigation(circ, config, seed_offset=0, p_gate=0.002):
+def make_mitigation(circ: "QuantumCircuit", config: dict, seed_offset: int = 0, p_gate: float = 0.002) -> tuple:
     """
     Create mitigation function based on strategy
     
@@ -156,7 +156,6 @@ def make_mitigation(circ, config, seed_offset=0, p_gate=0.002):
     Returns:
         (mitigation_function, gate_overhead)
     """
-    circ.seed = 42 + seed_offset*1000
     strategy_name = config['name']
     γm = config.get('γm', 1e-5)
     γc = config.get('γc', 0.05)
@@ -201,7 +200,7 @@ def make_mitigation(circ, config, seed_offset=0, p_gate=0.002):
         def dd_mitigation(ρ, iteration):
             """XY8 dynamical decoupling"""
             H = circ.H(iteration*2)
-            c_ops = circ.diss(1e-5)
+            c_ops = circ.diss(γm)
             sx, sy = circ.ops['sx'], circ.ops['sy']
             
             sequence = ['x','y','x','y','y','x','y','x']
@@ -263,7 +262,12 @@ def make_mitigation(circ, config, seed_offset=0, p_gate=0.002):
 # BENCHMARK RUNNER
 # ============================================================================
 
-def run_state_preparation(T=50, config=None, cycles=16, num_seeds=20):
+def run_state_preparation(
+    T: float = 50,
+    config: dict | None = None,
+    cycles: int = 16,
+    num_seeds: int = 20,
+) -> dict:
     """
     Run state preparation benchmark with statistical validation
     
@@ -276,6 +280,8 @@ def run_state_preparation(T=50, config=None, cycles=16, num_seeds=20):
     Returns:
         Dict with median, confidence intervals, gate overhead
     """
+    if config is None:
+        raise ValueError("config must be provided as a dict with at least a 'name' key")
     fidelities = []
     
     for seed_offset in range(num_seeds):
@@ -319,7 +325,7 @@ def run_state_preparation(T=50, config=None, cycles=16, num_seeds=20):
         'gates': gates
     }
 
-def optimize_gamma_compute(T=50, cycles=10, num_seeds=10):
+def optimize_gamma_compute(T: float = 50, cycles: int = 10, num_seeds: int = 10) -> float:
     """
     Grid search to find optimal γ_compute for given temperature
     
@@ -352,7 +358,7 @@ def optimize_gamma_compute(T=50, cycles=10, num_seeds=10):
 # TEMPERATURE SWEEP
 # ============================================================================
 
-def temperature_sweep(quick=False):
+def temperature_sweep(quick: bool = False, output_path: str = "adc_temperature_sweep.png") -> dict:
     """
     Comprehensive temperature sweep comparing all strategies
     
@@ -416,11 +422,11 @@ def temperature_sweep(quick=False):
                   f"gates={r['gates']}")
     
     # Plot results
-    plot_temperature_sweep(results)
+    plot_temperature_sweep(results, output_path)
     
     return results
 
-def plot_temperature_sweep(results):
+def plot_temperature_sweep(results: dict, output_path: str = "adc_temperature_sweep.png") -> None:
     """Create publication-quality temperature sweep plot"""
     
     fig = plt.figure(figsize=(14, 8))
@@ -454,8 +460,8 @@ def plot_temperature_sweep(results):
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('adc_temperature_sweep.png', dpi=150, bbox_inches='tight')
-    print(f"\n✅ Figure saved: adc_temperature_sweep.png")
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"\n✅ Figure saved: {output_path}")
     plt.close()
 
 # ============================================================================
@@ -471,6 +477,11 @@ def main():
         '--quick', 
         action='store_true',
         help='Run quick smoke test (for CI/testing, ~1-2 min)'
+    )
+    parser.add_argument(
+        '--output',
+        default='adc_temperature_sweep.png',
+        help='Output file path for the temperature sweep plot (default: adc_temperature_sweep.png)'
     )
     args = parser.parse_args()
     
@@ -490,7 +501,7 @@ def main():
         print("   Strategies: Baseline, DD, ADC, Hybrid")
         print("   Temperatures: 10, 30, 50, 70, 100 mK\n")
     
-    results = temperature_sweep(quick=args.quick)
+    results = temperature_sweep(quick=args.quick, output_path=args.output)
     
     print(f"\n{'='*80}")
     print("✅ BENCHMARK COMPLETED")
