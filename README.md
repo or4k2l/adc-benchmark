@@ -1,5 +1,7 @@
 # ADC-Benchmark
 
+![CI](https://github.com/or4k2l/adc-benchmark/actions/workflows/ci.yml/badge.svg)
+
 Adaptive Dissipation Control — Comprehensive benchmark suite for superconducting qubits.
 
 ## Features
@@ -42,6 +44,22 @@ python -m src
 Or:
 ```bash
 python src/adc_benchmark.py
+```
+
+### CLI flags
+
+| Flag | Description |
+|------|-------------|
+| `--quick` | Run abbreviated benchmark (50 mK only, ~1-2 min) |
+| `--output PATH` | Output path for the plot (default: `adc_temperature_sweep.png`) |
+| `--save-results` | Save results as both JSON **and** CSV to `--results-dir` |
+| `--results-dir DIR` | Directory for saved results (default: `results`) |
+| `--json` | Save results as JSON only |
+| `--csv` | Save results as CSV only |
+
+Example — save JSON after a quick run:
+```bash
+python -m src --quick --json
 ```
 
 ## Testing & CI

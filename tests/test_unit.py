@@ -120,7 +120,7 @@ def test_run_state_preparation_returns_expected_keys():
     config = {"name": "baseline", "γm": 1e-5}
     result = run_state_preparation(T=50, config=config, cycles=1, num_seeds=2)
 
-    assert set(result.keys()) == {"median", "ci_low", "ci_high", "gates"}
+    assert set(result.keys()) == {"median", "ci_low", "ci_high", "gates", "median_purity", "runtime_seconds"}
 
 
 def test_run_state_preparation_ci_ordering():

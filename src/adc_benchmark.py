@@ -27,6 +27,10 @@ import qutip as qt
 from datetime import datetime
 import warnings
 import argparse
+import time
+import json
+import csv
+import os
 warnings.filterwarnings('ignore', category=FutureWarning, module='qutip')
 warnings.filterwarnings('ignore', category=DeprecationWarning, module='qutip')
 
@@ -283,7 +287,9 @@ def run_state_preparation(
     if config is None:
         raise ValueError("config must be provided as a dict with at least a 'name' key")
     fidelities = []
+    purities = []
     
+    t_start = time.perf_counter()
     for seed_offset in range(num_seeds):
         # Create circuit with independent noise
         circ = QuantumCircuit(4, T, 42+seed_offset*100)
@@ -305,6 +311,12 @@ def run_state_preparation(
         # Measure fidelity
         fid = qt.fidelity(ρ, target)
         fidelities.append(fid)
+        
+        # Measure purity tr(ρ²)
+        purity = (ρ * ρ).tr().real
+        purities.append(purity)
+    
+    runtime_seconds = time.perf_counter() - t_start
     
     # Bootstrap confidence intervals
     # Use fixed RNG seed for reproducibility and bootstrap the MEDIAN
@@ -317,12 +329,15 @@ def run_state_preparation(
     ])
     ci_low, ci_high = np.quantile(bootstraps, [0.025, 0.975])
     median = float(np.median(fidelities))
+    median_purity = float(np.median(purities))
     
     return {
         'median': median,
         'ci_low': float(ci_low),
         'ci_high': float(ci_high),
-        'gates': gates
+        'gates': gates,
+        'median_purity': median_purity,
+        'runtime_seconds': runtime_seconds,
     }
 
 def optimize_gamma_compute(T: float = 50, cycles: int = 10, num_seeds: int = 10) -> float:
@@ -413,13 +428,16 @@ def temperature_sweep(quick: bool = False, output_path: str = "adc_temperature_s
             run_state_preparation(T, {'name':'hybrid', 'γm':1e-5, 'γc':best_gamma}, bench_cycles, bench_seeds)
         )
         
-        # Print summary
+        # Print summary table
         print(f"\n✅ RESULTS at T={T} mK:")
+        header = f"{'Strategy':<14} {'Median':>8}   {'95% CI':<22} {'Gates':>6}  {'Purity':>8}  {'Runtime(s)':>10}"
+        separator = f"{'--------':<14} {'------':>8}   {'------':<22} {'-----':>6}  {'------':>8}  {'----------':>10}"
+        print(header)
+        print(separator)
         for strategy_name in ['Baseline', 'DD', 'ADC opt', 'Hybrid opt']:
             r = results[strategy_name][-1]
-            print(f"   {strategy_name:12s}: median={r['median']:.4f}  "
-                  f"95% CI=[{r['ci_low']:.4f}, {r['ci_high']:.4f}]  "
-                  f"gates={r['gates']}")
+            ci_str = f"[{r['ci_low']:.4f}, {r['ci_high']:.4f}]"
+            print(f"{strategy_name:<14} {r['median']:>8.4f}   {ci_str:<22} {r['gates']:>6}  {r['median_purity']:>8.4f}  {r['runtime_seconds']:>10.1f}")
     
     # Plot results
     plot_temperature_sweep(results, output_path)
@@ -465,6 +483,65 @@ def plot_temperature_sweep(results: dict, output_path: str = "adc_temperature_sw
     plt.close()
 
 # ============================================================================
+# RESULTS EXPORT
+# ============================================================================
+
+def save_results(results: dict, output_dir: str = "results", save_json: bool = True, save_csv: bool = True) -> None:
+    """
+    Save benchmark results to JSON and/or CSV files.
+    
+    Args:
+        results: Results dict from temperature_sweep()
+        output_dir: Directory to save files (created if missing)
+        save_json: If True, save a JSON file
+        save_csv: If True, save a CSV file
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    
+    strategy_names = ['Baseline', 'DD', 'ADC opt', 'Hybrid opt']
+    
+    if save_json:
+        json_path = os.path.join(output_dir, f"benchmark_{timestamp}.json")
+        export = {
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "temperatures": results["T"],
+            "strategies": {
+                name: [
+                    {
+                        "median": r["median"],
+                        "ci_low": r["ci_low"],
+                        "ci_high": r["ci_high"],
+                        "gates": r["gates"],
+                        "median_purity": r["median_purity"],
+                        "runtime_seconds": r["runtime_seconds"],
+                    }
+                    for r in results[name]
+                ]
+                for name in strategy_names
+            },
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(export, f, indent=2)
+        print(f"   JSON saved: {json_path}")
+    
+    if save_csv:
+        csv_path = os.path.join(output_dir, f"benchmark_{timestamp}.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["temperature", "strategy", "median", "ci_low", "ci_high", "gates", "median_purity", "runtime_seconds"])
+            for i, T in enumerate(results["T"]):
+                for name in strategy_names:
+                    r = results[name][i]
+                    writer.writerow([
+                        T, name,
+                        r["median"], r["ci_low"], r["ci_high"], r["gates"],
+                        r["median_purity"], r["runtime_seconds"],
+                    ])
+        print(f"   CSV saved: {csv_path}")
+
+
+# ============================================================================
 # MAIN EXECUTION
 # ============================================================================
 
@@ -482,6 +559,26 @@ def main():
         '--output',
         default='adc_temperature_sweep.png',
         help='Output file path for the temperature sweep plot (default: adc_temperature_sweep.png)'
+    )
+    parser.add_argument(
+        '--save-results',
+        action='store_true',
+        help='Save benchmark results as both JSON and CSV to --results-dir'
+    )
+    parser.add_argument(
+        '--results-dir',
+        default='results',
+        help='Directory for saved results files (default: results)'
+    )
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        help='Save benchmark results as JSON to --results-dir'
+    )
+    parser.add_argument(
+        '--csv',
+        action='store_true',
+        help='Save benchmark results as CSV to --results-dir'
     )
     args = parser.parse_args()
     
@@ -502,6 +599,13 @@ def main():
         print("   Temperatures: 10, 30, 50, 70, 100 mK\n")
     
     results = temperature_sweep(quick=args.quick, output_path=args.output)
+    
+    # Determine which formats to save
+    do_json = args.save_results or args.json
+    do_csv = args.save_results or args.csv
+    if do_json or do_csv:
+        print(f"\n💾 Saving results to '{args.results_dir}'...")
+        save_results(results, output_dir=args.results_dir, save_json=do_json, save_csv=do_csv)
     
     print(f"\n{'='*80}")
     print("✅ BENCHMARK COMPLETED")
