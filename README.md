@@ -4,6 +4,8 @@
 
 Adaptive Dissipation Control — Comprehensive benchmark suite for superconducting qubits.
 
+<img width="2084" height="1182" alt="adc_temperature_sweep" src="https://github.com/user-attachments/assets/ec1c81e2-e15c-4fcd-ac8f-c12c56504005" />
+
 ## Features
 - Baseline, Dynamical Decoupling (XY8), ADC, Hybrid
 - Temperature-dependent optimization
